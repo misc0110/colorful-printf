@@ -1,0 +1,338 @@
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "colorprint.h"
+
+#define MAX_COMMAND_LENGTH 16
+
+
+typedef enum {
+    RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE, RESET, LIGHTRED, LIGHTGREEN, LIGHTYELLOW, LIGHTBLUE, LIGHTMAGENTA, LIGHTCYAN, LIGHTWHITE
+} ansi_color_t;
+
+
+typedef enum {
+    TAG_OPEN,
+    TAG_CLOSE
+} tag_t;
+
+typedef enum {
+    FOREGROUND,
+    BACKGROUND
+} color_type_t;
+
+typedef struct {
+    ansi_color_t stack[16];
+    int ptr;
+} colorstack_t;
+
+typedef struct {
+    char raw[MAX_COMMAND_LENGTH];
+    int valid;
+    tag_t tag;
+    size_t length;
+} command_t;
+
+typedef struct {
+    size_t len;
+    size_t capacity;
+    char* data;
+} buffer_t;
+
+typedef struct {
+    ansi_color_t color;
+    color_type_t type;
+} color_t;
+
+
+static const char *fg_color_strings[] = {
+        [RED] = "31",
+        [GREEN] = "32",
+        [YELLOW] = "33",
+        [BLUE] = "34",
+        [MAGENTA] = "35",
+        [CYAN] = "36",
+        [WHITE] = "30",
+        [RESET] = "0",
+        [LIGHTRED] = "91",
+        [LIGHTGREEN] = "92",
+        [LIGHTYELLOW] = "93",
+        [LIGHTBLUE] = "94",
+        [LIGHTMAGENTA] = "95",
+        [LIGHTCYAN] = "96",
+        [LIGHTWHITE] = "90"
+};
+
+
+static const char *bg_color_strings[] = {
+        [RESET] = "49",
+        [RED] = "41",
+        [GREEN] = "42",
+        [YELLOW] = "43",
+        [BLUE] = "44",
+        [MAGENTA] = "45",
+        [CYAN] = "46",
+        [WHITE] = "40",
+        [LIGHTRED] = "101",
+        [LIGHTGREEN] = "102",
+        [LIGHTYELLOW] = "103",
+        [LIGHTBLUE] = "104",
+        [LIGHTMAGENTA] = "105",
+        [LIGHTCYAN] = "106",
+        [LIGHTWHITE] = "100"
+};
+
+
+static void buffer_increase_size(buffer_t* buffer, size_t size) {
+    while(buffer->len + size >= buffer->capacity) {
+        if(buffer->capacity < 128) buffer->capacity = 128;
+        else buffer->capacity *= 2;
+    }
+    buffer->data = realloc(buffer->data, buffer->capacity);
+    memset(buffer->data + buffer->len, 0, buffer->capacity - buffer->len);
+}
+
+
+static buffer_t* buffer_create(size_t len) {
+    buffer_t* b = (buffer_t*)malloc(sizeof(buffer_t));
+    b->len = 0;
+    b->capacity = 0;
+    b->data = NULL;
+    buffer_increase_size(b, len);
+    return b;
+}
+
+static void buffer_append_char(buffer_t* buffer, char c) {
+    buffer_increase_size(buffer, 1);
+    buffer->data[buffer->len++] = c;
+    buffer->data[buffer->len] = 0;
+}
+
+static void buffer_append_string(buffer_t* buffer, char* str) {
+    buffer_increase_size(buffer, strlen(str));
+    strcpy(buffer->data + buffer->len, str);
+    buffer->len += strlen(str);
+    buffer->data[buffer->len] = 0;
+}
+
+
+static void colorstack_push(colorstack_t *stack, ansi_color_t color) {
+    if (stack->ptr >= 16) {
+        return;
+    }
+    stack->stack[stack->ptr++] = color;
+}
+
+static ansi_color_t colorstack_pop(colorstack_t *stack) {
+    if (stack->ptr <= 0) {
+        return RESET;
+    }
+    return stack->stack[--stack->ptr];
+}
+
+static int parse_command(const char* str, command_t* cmd) {
+    int i = 0;
+    cmd->valid = 0;
+    size_t len = strlen(str);
+    if(*str != '[') return 0;
+
+    while(i < len) {
+        if(str[i] == ' ') {
+            break;
+        }
+        if(str[i] == ']') {
+            cmd->valid = 1;
+            break;
+        }
+        i++;
+    }
+    if(!cmd->valid) return 0;
+
+    int closing = 0;
+    if(len > 1) {
+        if(str[1] == '/') {
+            cmd->tag = TAG_CLOSE;
+            closing = 1;
+        }
+        else cmd->tag = TAG_OPEN;
+    }
+
+    if(i < MAX_COMMAND_LENGTH) {
+        memset(cmd->raw, 0, MAX_COMMAND_LENGTH);
+        memcpy(cmd->raw, str + closing + 1, i - closing - 1);
+    }
+
+    cmd->length = strlen(cmd->raw) + 1 + closing;
+
+    return cmd->length;
+}
+
+static int parse_color(const char* str, color_t* color) {
+    if(!strcmp(str, "r")) {
+        color->color = RED;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "g")) {
+        color->color = GREEN;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "b")) {
+        color->color = BLUE;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "c")) {
+        color->color = CYAN;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "m")) {
+        color->color = MAGENTA;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "y")) {
+        color->color = YELLOW;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "w")) {
+        color->color = WHITE;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lr")) {
+        color->color = LIGHTRED;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lg")) {
+        color->color = LIGHTGREEN;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lb")) {
+        color->color = LIGHTBLUE;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lc")) {
+        color->color = LIGHTCYAN;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lm")) {
+        color->color = LIGHTMAGENTA;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "ly")) {
+        color->color = LIGHTYELLOW;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "lw")) {
+        color->color = LIGHTWHITE;
+        color->type = FOREGROUND;
+    } else if(!strcmp(str, "br")) {
+        color->color = RED;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bg")) {
+        color->color = GREEN;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bb")) {
+        color->color = BLUE;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bc")) {
+        color->color = CYAN;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bm")) {
+        color->color = MAGENTA;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "by")) {
+        color->color = YELLOW;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bw")) {
+        color->color = WHITE;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blr")) {
+        color->color = LIGHTRED;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blg")) {
+        color->color = LIGHTGREEN;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blb")) {
+        color->color = LIGHTBLUE;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blc")) {
+        color->color = LIGHTCYAN;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blm")) {
+        color->color = LIGHTMAGENTA;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "bly")) {
+        color->color = LIGHTYELLOW;
+        color->type = BACKGROUND;
+    } else if(!strcmp(str, "blw")) {
+        color->color = LIGHTWHITE;
+        color->type = BACKGROUND;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
+
+void printf_color(int enable, const char *fmt, ...) {
+    colorstack_t stack = {{0}};
+    colorstack_t bgstack = {{0}};
+
+    int i, len = strlen(fmt), ptr = 0;
+    buffer_t *fmt_replace = buffer_create(len);
+    command_t command = {.valid = 0};
+    ansi_color_t color = RESET;
+    ansi_color_t bgcolor = RESET;
+    for (i = 0; i < len; i++) {
+        i += parse_command(fmt + i, &command);
+        int set_color = 0;
+        int set_bgcolor = 0;
+        if(command.valid) {
+            if(command.tag == TAG_CLOSE) {
+                color_t parsed_color;
+                if(parse_color(command.raw, &parsed_color)) {
+                    if(parsed_color.type == FOREGROUND) {
+                        set_color = 1;
+                        color = colorstack_pop(&stack);
+                    } else {
+                        set_bgcolor = 1;
+                        bgcolor = colorstack_pop(&bgstack);
+                    }
+                } else {
+                    command.valid = 0;
+                    i -= command.length;
+                }
+            } else {
+                ansi_color_t last_color = color;
+                ansi_color_t last_bgcolor = bgcolor;
+                color_t parsed_color;
+                if(parse_color(command.raw, &parsed_color)) {
+                    if(parsed_color.type == FOREGROUND) {
+                        color = parsed_color.color;
+                        set_color = 1;
+                    } else {
+                        bgcolor = parsed_color.color;
+                        set_bgcolor = 1;
+                    }
+                } else {
+                    command.valid = 0;
+                    i -= command.length;
+                }
+                if(command.valid) {
+                    if(set_color) {
+                        colorstack_push(&stack, last_color);
+                    }
+                    if(set_bgcolor) {
+                        colorstack_push(&bgstack, last_bgcolor);
+                    }
+                }
+            }
+            if(enable && command.valid) {
+                if(set_color || set_bgcolor) {
+                    char format[32];
+                    sprintf(format, "\x1b[%s;%sm", fg_color_strings[color], bg_color_strings[bgcolor]);
+                    buffer_append_string(fmt_replace, format);
+                }
+            }
+        }
+
+
+        if(!command.valid) {
+            buffer_append_char(fmt_replace, fmt[i]);
+        }
+    }
+
+    fmt = fmt_replace->data;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stdout, fmt, ap);
+    va_end(ap);
+    free(fmt_replace->data);
+    free(fmt_replace);
+}
