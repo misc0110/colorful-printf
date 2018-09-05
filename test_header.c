@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <unistd.h>
 #include "colorprint_header.h"
 
 int main() {

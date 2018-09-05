@@ -132,7 +132,7 @@ static ansi_color_t colorstack_pop(colorstack_t *stack) {
 }
 
 static int parse_command(const char* str, command_t* cmd) {
-    int i = 0;
+    size_t i = 0;
     cmd->valid = 0;
     size_t len = strlen(str);
     if(*str != '[') return 0;
@@ -260,10 +260,12 @@ static int parse_color(const char* str, color_t* color) {
 }
 
 static void vprintf_color(int enable, const char* fmt, va_list arg) {
-    colorstack_t stack = {{0}};
-    colorstack_t bgstack = {{0}};
+    colorstack_t stack;
+    memset(&stack, 0, sizeof(stack));
+    colorstack_t bgstack;
+    memset(&bgstack, 0, sizeof(bgstack));
 
-    int i, len = strlen(fmt), ptr = 0;
+    int i, len = strlen(fmt);
     buffer_t *fmt_replace = buffer_create(len);
     command_t command = {.valid = 0};
     ansi_color_t color = RESET;
