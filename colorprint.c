@@ -259,7 +259,7 @@ static int parse_color(const char* str, color_t* color) {
     return 1;
 }
 
-void vprintf_color(int enable, const char* fmt, va_list arg) {
+static void vprintf_color(int enable, const char* fmt, va_list arg) {
     colorstack_t stack = {{0}};
     colorstack_t bgstack = {{0}};
 
@@ -341,11 +341,61 @@ void printf_color(int enable, const char *fmt, ...) {
 
 
 static int spinner_state = 0;
-static const char* spinner_value = "|/-\\";
+static const char* spinner_value_0[] = {
+    "|",
+    "/",
+    "-",
+    "\\",
+    NULL
+};
 
-void spinner_start(int color, const char* fmt, ...) {
+static const char* spinner_value_1[] = {
+  "\x1b(0t\x1b(A",
+  "\x1b(0w\x1b(A",
+  "\x1b(0u\x1b(A",
+  "\x1b(0v\x1b(A",
+  NULL
+};
+
+static const char* spinner_value_2[] = {
+  "\x1b(0j\x1b(A",
+  "\x1b(0m\x1b(A",
+  "\x1b(0l\x1b(A",
+  "\x1b(0k\x1b(A",
+  NULL
+};
+
+static const char* spinner_value_3[] = {
+  "\x1b(0m\x1b(A",
+  "\x1b(0t\x1b(A",
+  "\x1b(0n\x1b(A",
+  "\x1b(0u\x1b(A",
+  "\x1b(0j\x1b(A",
+  NULL
+};
+
+static const char* spinner_value_4[] = {
+  "\x1b(0m\x1b(A",
+  "\x1b(0x\x1b(A",
+  "\x1b(0l\x1b(A",
+  "\x1b(0q\x1b(A",
+  "\x1b(0k\x1b(A",
+  "\x1b(0x\x1b(A",
+  "\x1b(0j\x1b(A",
+  "\x1b(0q\x1b(A",
+  NULL
+};
+
+static const char** spinner_values[] = {
+  spinner_value_0, spinner_value_1, spinner_value_2, spinner_value_3, spinner_value_4
+};
+
+static char** spinner_value = (char**)spinner_value_0;
+
+void spinner_start(int color, unsigned int type, const char* fmt, ...) {
+    spinner_value = (char**)spinner_values[type % (sizeof(spinner_values) / sizeof(spinner_values[0]))];
     spinner_state = 0;
-    printf("\x1b[s[%c] ", spinner_value[spinner_state]);
+    printf("\x1b[s[%s] ", spinner_value[spinner_state]);
     va_list ap;
     va_start(ap, fmt);
     vprintf_color(color, fmt, ap);
@@ -355,8 +405,9 @@ void spinner_start(int color, const char* fmt, ...) {
 
 
 void spinner_update(int color, const char* fmt, ...) {
-    spinner_state = (spinner_state + 1) % strlen(spinner_value);
-    printf("\x1b[u[%c] \x1b[K", spinner_value[spinner_state]);
+    spinner_state++;
+    if(!spinner_value[spinner_state]) spinner_state = 0;
+    printf("\x1b[u[%s] \x1b[K", spinner_value[spinner_state]);
     va_list ap;
     va_start(ap, fmt);
     vprintf_color(color, fmt, ap);

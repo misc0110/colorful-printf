@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include "colorprint.h"
+#include "colorprint_header.h"
 
 int main() {
     printf_color(1, "[lr][br][+][/br][/lr] [lr]Error[/lr] [lw]or[/lw] [g]s[lg]o[/lg]meth[/g]ing similar\n");
@@ -24,5 +23,4 @@ int main() {
         usleep(100000);
         progress_update(1);
     }
-    return 0;
 }
