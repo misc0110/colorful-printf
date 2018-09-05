@@ -4,6 +4,14 @@
 #include <stdlib.h>
 #include "colorprint.h"
 
+#ifndef STRICT
+#define STRICT 0
+#endif
+
+#ifndef DEBUG
+#define DEBUG (void)
+#endif
+
 #define MAX_COMMAND_LENGTH 16
 
 
@@ -169,25 +177,25 @@ static int parse_command(const char* str, command_t* cmd) {
 }
 
 static int parse_color(const char* str, color_t* color) {
-    if(!strcmp(str, "r")) {
+    if(!strcmp(str, "r") || !strcmp(str, "red")) {
         color->color = RED;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "g")) {
+    } else if(!strcmp(str, "g") || !strcmp(str, "green")) {
         color->color = GREEN;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "b")) {
+    } else if(!strcmp(str, "b") || !strcmp(str, "blue")) {
         color->color = BLUE;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "c")) {
+    } else if(!strcmp(str, "c") || !strcmp(str, "cyan")) {
         color->color = CYAN;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "m")) {
+    } else if(!strcmp(str, "m") || !strcmp(str, "magenta")) {
         color->color = MAGENTA;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "y")) {
+    } else if(!strcmp(str, "y") || !strcmp(str, "yellow")) {
         color->color = YELLOW;
         color->type = FOREGROUND;
-    } else if(!strcmp(str, "w")) {
+    } else if(!strcmp(str, "w") || !strcmp(str, "white")) {
         color->color = WHITE;
         color->type = FOREGROUND;
     } else if(!strcmp(str, "lr")) {
@@ -280,10 +288,26 @@ static void vprintf_color(int enable, const char* fmt, va_list arg) {
                 if(parse_color(command.raw, &parsed_color)) {
                     if(parsed_color.type == FOREGROUND) {
                         set_color = 1;
+#if STRICT
+                        if(color != parsed_color.color) {
+                            DEBUG("Warning: tag [/%s] does not match!\n", command.raw);
+                        } else {
+                            color = colorstack_pop(&stack);
+                        }
+#else
                         color = colorstack_pop(&stack);
+#endif
                     } else {
                         set_bgcolor = 1;
+#if STRICT
+                        if(bgcolor != parsed_color.color) {
+                            DEBUG("Warning: tag [/%s] does not match!\n", command.raw);
+                        } else {
+                            bgcolor = colorstack_pop(&bgstack);
+                        }
+#else
                         bgcolor = colorstack_pop(&bgstack);
+#endif
                     }
                 } else {
                     command.valid = 0;
@@ -328,9 +352,18 @@ static void vprintf_color(int enable, const char* fmt, va_list arg) {
             buffer_append_char(fmt_replace, fmt[i]);
         }
     }
+
+#if STRICT
+    if(stack.ptr > 0 || bgstack.ptr > 0) {
+        DEBUG("Warning: Missing closing tag\n");
+        buffer_append_string(fmt_replace, "\x1b[0m");
+    }
+#endif
+
     vfprintf(stdout, fmt_replace->data, arg);
     free(fmt_replace->data);
     free(fmt_replace);
+
 }
 
 

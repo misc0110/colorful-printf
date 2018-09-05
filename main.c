@@ -7,6 +7,10 @@ int main() {
     printf_color(1, "[blr][r][+][/r][/blr] E[bb]r[/bb][bg]r[/bg]or foo\n");
     printf_color(1, "[r][+][/r] [r]Red [g]green[/g] red again[/r] [br]w[lw]h[/lw]ite[/br] [y] foo [ly][/bar][/ly][/y] [default\n");
     printf_color(1, "[ r]not red[/r] normal\n");
+    printf_color(1, "test [red]red[/red] normal\n");
+    printf_color(1, "test [red]red[/green] normal?\n");
+    printf_color(1, "to [blue]blue\n");
+    printf_color(1, "is this blue[/blue]?\n");
 
     printf("Spinner: ");
     fflush(stdout);
