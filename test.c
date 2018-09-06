@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
-#include "colorprint_header.h"
+#include "colorprint.h"
 
 int main(int argc, char* argv[]) {
     (void)argv;

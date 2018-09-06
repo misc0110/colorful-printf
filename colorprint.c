@@ -61,7 +61,7 @@ static const char *fg_color_strings[] = {
         [BLUE] = "34",
         [MAGENTA] = "35",
         [CYAN] = "36",
-        [WHITE] = "30",
+        [WHITE] = "37",
         [RESET] = "0",
         [LIGHTRED] = "91",
         [LIGHTGREEN] = "92",
@@ -69,7 +69,7 @@ static const char *fg_color_strings[] = {
         [LIGHTBLUE] = "94",
         [LIGHTMAGENTA] = "95",
         [LIGHTCYAN] = "96",
-        [LIGHTWHITE] = "90"
+        [LIGHTWHITE] = "97"
 };
 
 
@@ -81,14 +81,14 @@ static const char *bg_color_strings[] = {
         [BLUE] = "44",
         [MAGENTA] = "45",
         [CYAN] = "46",
-        [WHITE] = "40",
+        [WHITE] = "47",
         [LIGHTRED] = "101",
         [LIGHTGREEN] = "102",
         [LIGHTYELLOW] = "103",
         [LIGHTBLUE] = "104",
         [LIGHTMAGENTA] = "105",
         [LIGHTCYAN] = "106",
-        [LIGHTWHITE] = "100"
+        [LIGHTWHITE] = "107"
 };
 
 
